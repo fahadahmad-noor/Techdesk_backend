@@ -1,0 +1,32 @@
+# Maven build directories
+target/
+**/target/
+*.releaseBackup
+
+# IDEs and Editors
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# Environment variables and secrets
+.env
+
+# System / logs
+*.log
+.DS_Store
+sys_health/
+logs/
+
+# Frontend (Separate Repository)
+frontend/
+
+# Exclude resources directory
+**/src/main/resources/
+
+# Temporary scripts
+scratch/
