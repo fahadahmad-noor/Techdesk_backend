@@ -41,6 +41,13 @@ services:
       timeout: 5s
       retries: 5
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - "1025:1025"   # SMTP — auth-service sends emails here
+      - "8025:8025"   # Web UI — view emails at http://localhost:8025
+
   eureka-server:
     build:
       context: ./services/eureka-server
