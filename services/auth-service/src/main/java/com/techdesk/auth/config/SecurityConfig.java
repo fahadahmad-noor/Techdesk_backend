@@ -18,16 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/**
- * Spring Security configuration for auth-service.
- *
- * Key decisions:
- * - Stateless session (JWT-based, no server-side sessions)
- * - CSRF disabled (REST API — clients are not browser-based)
- * - /api/auth/** endpoints are public (login, register, etc.)
- * - All other routes require a valid JWT
- * - BCrypt password encoder with strength 12 (as per security requirements)
- */
+// Stateless JWT security — /api/auth/** is public, everything else needs a valid token
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -49,11 +40,8 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Auth endpoints are public — no JWT required
                 .requestMatchers("/api/auth/**").permitAll()
-                // Actuator health check is public
                 .requestMatchers("/actuator/**").permitAll()
-                // Everything else requires authentication
                 .anyRequest().authenticated())
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -61,10 +49,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * BCrypt password encoder with cost factor 12.
-     * Minimum requirement from the security guidelines in the roadmap.
-     */
+    // BCrypt cost factor 12 as required by the security guidelines
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);

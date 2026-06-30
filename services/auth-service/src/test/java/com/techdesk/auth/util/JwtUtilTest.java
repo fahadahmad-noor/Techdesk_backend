@@ -72,7 +72,7 @@ class JwtUtilTest {
     void refreshToken_typeIsRefresh() {
         String jti = UUID.randomUUID().toString();
         String token = jwtUtil.generateRefreshToken(
-                UUID.randomUUID(), "tenant_test", jti);
+                UUID.randomUUID(), "tenant_test", "EMPLOYEE", jti);
 
         assertEquals("refresh", jwtUtil.extractType(token));
     }
@@ -82,7 +82,7 @@ class JwtUtilTest {
     void refreshToken_containsJti() {
         String jti = UUID.randomUUID().toString();
         String token = jwtUtil.generateRefreshToken(
-                UUID.randomUUID(), "tenant_test", jti);
+                UUID.randomUUID(), "tenant_test", "SUPER_ADMIN", jti);
 
         assertEquals(jti, jwtUtil.extractJti(token));
     }

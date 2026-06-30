@@ -7,13 +7,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-/**
- * Handles outbound email communication for the tenant-service.
- *
- * In local development, all emails are captured by MailHog (http://localhost:8025)
- * and never delivered to real recipients. In production, this service connects to
- * the configured SMTP server via JavaMailSender.
- */
+// Sends welcome and onboarding emails — captured by MailHog in local dev, real SMTP in production
 @Service
 public class EmailService {
 
@@ -28,17 +22,7 @@ public class EmailService {
         this.frontendUrl = frontendUrl;
     }
 
-    /**
-     * Sends a welcome and account-setup email to the newly created Company Admin.
-     *
-     * The email instructs the admin to set their password and begin configuring their
-     * TechDesk environment. The temporary password is included as a first-login credential.
-     *
-     * @param adminEmail      the Company Admin's email address
-     * @param adminFirstName  the Company Admin's first name (used in the greeting)
-     * @param companyName     the name of the newly onboarded company
-     * @param temporaryPassword the system-generated temporary password for first login
-     */
+    // Sends login credentials to the new Company Admin — email failure never blocks tenant creation
     public void sendWelcomeEmail(String adminEmail, String adminFirstName,
                                   String companyName, String temporaryPassword) {
         try {
@@ -51,15 +35,10 @@ public class EmailService {
             log.info("Welcome email dispatched to: {}", adminEmail);
 
         } catch (Exception ex) {
-            // Email delivery failure must never prevent the tenant from being created.
-            // The admin account already exists — the password can be reset via the forgot-password flow.
             log.error("Failed to send welcome email to {}. Tenant creation will proceed.", adminEmail, ex);
         }
     }
 
-    /**
-     * Constructs the plain-text body of the welcome email.
-     */
     private String buildWelcomeEmailBody(String firstName, String companyName,
                                           String email, String temporaryPassword) {
         return String.format(

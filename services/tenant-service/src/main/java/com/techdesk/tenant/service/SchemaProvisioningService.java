@@ -10,17 +10,7 @@ import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
 
-/**
- * Responsible for the low-level database operations required when a new tenant is onboarded.
- *
- * This service handles two operations in strict sequence:
- *   1. CREATE SCHEMA — allocates an isolated PostgreSQL schema for the new tenant.
- *   2. Flyway migration — runs all tenant-specific SQL scripts against the new schema,
- *      creating the full table structure (users, tickets, assets, etc.).
- *
- * Rollback guarantee: if either step fails, the schema is dropped via DROP SCHEMA ... CASCADE
- * before the exception is re-thrown, ensuring the database is never left in a partial state.
- */
+// Creates the tenant PostgreSQL schema and runs Flyway migrations — drops schema on any failure
 @Service
 public class SchemaProvisioningService {
 
@@ -38,15 +28,7 @@ public class SchemaProvisioningService {
         this.tenantMigrationLocation = tenantMigrationLocation;
     }
 
-    /**
-     * Creates the PostgreSQL schema for a new tenant and runs all Flyway tenant migrations against it.
-     *
-     * If schema creation succeeds but the Flyway migration fails, the schema is dropped completely
-     * (DROP SCHEMA ... CASCADE) before throwing SchemaProvisioningException, guaranteeing a clean rollback.
-     *
-     * @param schemaName the validated schema name for the new tenant (e.g., "tenant_acme_corp")
-     * @throws SchemaProvisioningException if either schema creation or migration fails
-     */
+    // Runs CREATE SCHEMA then Flyway — on any error, rolls back with DROP SCHEMA CASCADE
     public void provisionSchema(String schemaName) {
         log.info("Starting schema provisioning for: {}", schemaName);
 
@@ -62,22 +44,13 @@ public class SchemaProvisioningService {
         }
     }
 
-    /**
-     * Executes CREATE SCHEMA against the PostgreSQL database.
-     * Uses quoted identifiers to safely handle schema names with underscores.
-     */
     private void createSchema(String schemaName) {
         log.debug("Executing CREATE SCHEMA for: {}", schemaName);
         jdbcTemplate.execute("CREATE SCHEMA \"" + schemaName + "\"");
         log.info("Schema created: {}", schemaName);
     }
 
-    /**
-     * Builds a programmatic Flyway instance targeting the new tenant schema and runs all
-     * migration scripts from the configured tenant migration classpath location.
-     *
-     * Each tenant gets the same set of tables (V1 through V11) created in their isolated schema.
-     */
+    // Builds a Flyway instance pointing at the new schema and runs all V1-V11 migration scripts
     private void runMigrations(String schemaName) {
         log.debug("Running Flyway migrations against schema: {}", schemaName);
 
@@ -92,11 +65,7 @@ public class SchemaProvisioningService {
         log.info("Flyway migrations completed for schema: {}", schemaName);
     }
 
-    /**
-     * Attempts to drop the newly created schema and all its contents.
-     * Called only when provisioning fails, to restore the database to its pre-creation state.
-     * Errors during rollback are logged but suppressed to allow the original exception to propagate.
-     */
+    // Best-effort cleanup — errors here are suppressed so the original exception propagates
     private void attemptRollback(String schemaName) {
         try {
             log.warn("Rolling back: dropping schema {}", schemaName);

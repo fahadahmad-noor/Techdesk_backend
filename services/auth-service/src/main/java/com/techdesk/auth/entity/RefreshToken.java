@@ -7,33 +7,23 @@ import org.springframework.data.redis.core.index.Indexed;
 
 import java.util.UUID;
 
-/**
- * Redis entity representing an active refresh token.
- *
- * Stored as a Redis Hash with key: "refresh_token:<jti>"
- *
- * The `used` flag is the core of replay attack detection:
- * - On first use → set used = true, issue new token pair
- * - On subsequent use → replay attack detected, revoke ALL tokens
- *
- * TTL is set to 7 days (604800 seconds), matching the JWT expiry.
- * Redis automatically deletes the entry when TTL expires.
- */
+// Redis entity for an active refresh token — key: "refresh_token:<jti>", TTL: 7 days
+// used=true means the token was already consumed; a second use = replay attack
 @RedisHash("refresh_token")
 public class RefreshToken {
 
     @Id
-    private String jti;          // JWT ID — used as Redis key
+    private String jti;
 
     @Indexed
-    private String userId;       // String form of UUID for Redis indexing
+    private String userId;
 
-    private String tenantId;     // Schema name
+    private String tenantId;
     private String role;
-    private boolean used;        // Replay attack detection flag
+    private boolean used;
 
     @TimeToLive
-    private long ttl = 604800L;  // 7 days in seconds
+    private long ttl = 604800L; // 7 days in seconds
 
     // Getters and Setters
 

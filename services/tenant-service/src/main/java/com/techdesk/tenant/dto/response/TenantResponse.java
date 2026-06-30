@@ -6,10 +6,7 @@ import com.techdesk.tenant.entity.TenantStatus;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * Outgoing payload returned after creating a tenant or fetching tenant details.
- * Exposed to the Super Admin via the tenant management endpoints.
- */
+// Response DTO for tenant creation and listing endpoints
 public class TenantResponse {
 
     private UUID id;

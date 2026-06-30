@@ -11,12 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Spring Security's UserDetailsService implementation.
- * Loads users from the tenant-schema users table via UserRepository.
- * The correct tenant schema is already set in TenantContextHolder
- * by the time this is called during authentication.
- */
+// Loads the user from the tenant schema — schema is already set in TenantContextHolder by the interceptor
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 

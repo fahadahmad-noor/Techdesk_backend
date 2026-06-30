@@ -23,36 +23,16 @@ import java.security.SecureRandom;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Core business logic for tenant lifecycle management.
- *
- * Orchestrates the full tenant onboarding flow:
- *   1. Validates that the company name is unique.
- *   2. Generates a safe PostgreSQL schema name from the company name.
- *   3. Inserts the tenant record into public.tenants with PENDING status.
- *   4. Delegates schema creation and Flyway migrations to SchemaProvisioningService.
- *   5. Creates the default COMPANY_ADMIN user inside the new tenant schema.
- *   6. Sends the welcome email via EmailService.
- *   7. Updates the tenant status to ACTIVE.
- *
- * The challenge task (transactional rollback) is handled inside SchemaProvisioningService:
- * if provisioning fails, the schema is dropped and this method re-throws the exception,
- * causing Spring's @Transactional to roll back the public.tenants record insertion as well.
- */
+// Handles the full tenant onboarding flow — schema creation, migrations, admin user, and email
 @Service
 public class TenantService {
 
     private static final Logger log = LoggerFactory.getLogger(TenantService.class);
 
-    /**
-     * Character set used when generating temporary passwords.
-     * Excludes visually ambiguous characters (0, O, l, I) to reduce
-     * copy-paste errors when admins read the password from their email.
-     */
+    // Excludes visually ambiguous characters like 0/O and l/I to reduce copy-paste errors
     private static final String TEMP_PASSWORD_CHARS =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
 
-    /** Cryptographically secure random source for temporary password generation. */
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final TenantRepository tenantRepository;
@@ -73,29 +53,22 @@ public class TenantService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    /**
-     * Onboards a new company onto the TechDesk platform.
-     *
-     * This is a transactional operation. If schema provisioning fails, Spring will roll back
-     * the public.tenants insert, and SchemaProvisioningService will drop the partial schema.
-     *
-     * @param request the validated onboarding request from the Super Admin
-     * @return a TenantResponse containing the new tenant's details
-     * @throws TenantAlreadyExistsException if the company name is already taken
-     */
+    // Creates schema, runs migrations, creates admin user, sends email — rolls back fully on any failure
     @Transactional
     public TenantResponse createTenant(CreateTenantRequest request) {
         log.info("Processing tenant creation request for: {}", request.getCompanyName());
 
-        // Guard: reject duplicate company names before doing any database work.
         if (tenantRepository.existsByName(request.getCompanyName())) {
             throw new TenantAlreadyExistsException(request.getCompanyName());
         }
 
-        // Derive a safe, unique schema name from the company name.
         String schemaName = generateSchemaName(request.getCompanyName());
 
-        // Insert the tenant record with PENDING status so it is visible during provisioning.
+        // Also check the generated schema name — "Acme Corp" and "Acme-Corp" both map to tenant_acme_corp
+        if (tenantRepository.existsBySchemaName(schemaName)) {
+            throw new TenantAlreadyExistsException(request.getCompanyName());
+        }
+
         Tenant tenant = new Tenant();
         tenant.setId(UUID.randomUUID());
         tenant.setName(request.getCompanyName());
@@ -103,28 +76,21 @@ public class TenantService {
         tenant.setStatus(TenantStatus.PENDING);
         tenant.setPlan(TenantPlan.valueOf(request.getPlan()));
 
-        // Wrap save() to handle the rare concurrent-creation race condition (TOCTOU).
-        // If two simultaneous requests pass the existsByName check, the DB unique constraint
-        // on the name column will reject the second insert — we translate that to our
-        // clean domain exception so callers always receive a 409, never a raw 500.
+        // Catches the rare case where two concurrent requests both pass the name check
         try {
             tenantRepository.save(tenant);
         } catch (DataIntegrityViolationException ex) {
             throw new TenantAlreadyExistsException(request.getCompanyName());
         }
 
-        // Provision the isolated PostgreSQL schema and run all tenant Flyway migrations.
-        // If this throws, @Transactional rolls back the tenant record and the schema is dropped.
         schemaProvisioningService.provisionSchema(schemaName);
 
-        // Generate a cryptographically secure temporary password for the first Company Admin login.
         String temporaryPassword = generateTemporaryPassword();
         String hashedPassword = passwordEncoder.encode(temporaryPassword);
 
-        // Insert the default COMPANY_ADMIN user directly into the new tenant schema.
         createDefaultAdminUser(schemaName, request, hashedPassword);
 
-        // Dispatch the welcome email. Failure here is non-fatal — the tenant is already operational.
+        // Email failure is non-fatal — tenant is already active at this point
         emailService.sendWelcomeEmail(
                 request.getAdminEmail(),
                 request.getAdminFirstName(),
@@ -132,7 +98,6 @@ public class TenantService {
                 temporaryPassword
         );
 
-        // Mark the tenant as fully operational.
         tenant.setStatus(TenantStatus.ACTIVE);
         tenantRepository.save(tenant);
 
@@ -149,14 +114,7 @@ public class TenantService {
         );
     }
 
-    /**
-     * Returns a paginated list of all tenants on the platform.
-     * Supports optional filtering by status (ACTIVE, SUSPENDED, PENDING).
-     *
-     * @param status   optional status filter; if null, all tenants are returned
-     * @param pageable pagination and sorting parameters
-     * @return a Page of TenantResponse objects
-     */
+    // Returns paginated tenants, optionally filtered by status
     @Transactional(readOnly = true)
     public Page<TenantResponse> getAllTenants(TenantStatus status, Pageable pageable) {
         Page<Tenant> tenants = (status != null)
@@ -169,15 +127,7 @@ public class TenantService {
         ));
     }
 
-    /**
-     * Updates the lifecycle status of an existing tenant (ACTIVE or SUSPENDED).
-     * When suspended, the tenant's users will be denied login by the auth-service.
-     *
-     * @param tenantId the UUID of the tenant to update
-     * @param request  the status change request
-     * @return the updated TenantResponse
-     * @throws TenantNotFoundException if no tenant exists with the given ID
-     */
+    // Updates tenant to ACTIVE or SUSPENDED — dirty-checking flushes the change automatically
     @Transactional
     public TenantResponse updateTenantStatus(UUID tenantId, UpdateTenantStatusRequest request) {
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -185,10 +135,9 @@ public class TenantService {
 
         TenantStatus newStatus = TenantStatus.valueOf(request.getStatus());
         tenant.setStatus(newStatus);
-        // No explicit save() needed: the entity is JPA-managed within this @Transactional
-        // boundary. Hibernate's dirty-checking will flush the status change automatically
-        // on transaction commit.
 
+        tenantRepository.save(tenant);
+        
         log.info("Tenant '{}' status updated to {}.", tenant.getName(), newStatus);
 
         return new TenantResponse(
@@ -197,20 +146,7 @@ public class TenantService {
         );
     }
 
-    /**
-     * Converts a company name into a safe PostgreSQL schema name.
-     *
-     * Rules applied:
-     *   - Converted to lowercase
-     *   - All non-alphanumeric characters replaced with underscores
-     *   - Consecutive underscores collapsed to a single underscore
-     *   - Prefixed with "tenant_" to namespace all tenant schemas clearly
-     *
-     * Example: "Acme Corp & Partners!" → "tenant_acme_corp_partners"
-     *
-     * @param companyName the raw company name from the onboarding request
-     * @return a valid, namespaced PostgreSQL schema name
-     */
+    // Converts company name to a valid PostgreSQL schema name e.g. "Acme Corp" -> "tenant_acme_corp"
     String generateSchemaName(String companyName) {
         String normalized = companyName
                 .toLowerCase()
@@ -220,15 +156,7 @@ public class TenantService {
         return "tenant_" + normalized;
     }
 
-    /**
-     * Generates a 14-character cryptographically secure temporary password.
-     *
-     * Uses SecureRandom (not UUID.randomUUID which uses java.util.Random internally)
-     * and a curated character set that excludes visually ambiguous characters
-     * (e.g., 0/O, l/I/1) to reduce copy-paste errors when admins read the email.
-     *
-     * @return a random 14-character password string
-     */
+    // Generates a 14-char secure random password using SecureRandom
     private String generateTemporaryPassword() {
         return SECURE_RANDOM
                 .ints(14, 0, TEMP_PASSWORD_CHARS.length())
@@ -236,14 +164,7 @@ public class TenantService {
                 .collect(Collectors.joining());
     }
 
-    /**
-     * Inserts the default COMPANY_ADMIN user directly into the new tenant schema.
-     *
-     * This uses JdbcTemplate with a fully qualified schema-prefixed table reference
-     * because JPA/Hibernate multi-tenancy routing is not yet configured (that is Phase 3.4).
-     * The user is created with INVITED status so the system can track that they have not yet
-     * changed their temporary password.
-     */
+    // Inserts the first COMPANY_ADMIN directly into the new schema using raw SQL — JPA routing comes in Phase 3.4
     private void createDefaultAdminUser(String schemaName, CreateTenantRequest request, String hashedPassword) {
         String sql = String.format(
             "INSERT INTO \"%s\".users (id, email, password_hash, first_name, last_name, role, status) " +

@@ -19,15 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * JWT authentication filter — runs once per request.
- *
- * Reads the Authorization: Bearer <token> header, validates the JWT,
- * extracts userId/tenantId/role from claims, and sets the SecurityContext
- * so that downstream method-level @PreAuthorize checks work correctly.
- *
- * Only processes ACCESS tokens. Refresh tokens are handled explicitly in AuthService.
- */
+// Reads Bearer token from Authorization header and populates the SecurityContext
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -55,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String token = authHeader.substring(7);
 
         try {
-            // Reject refresh tokens passed as access tokens
+            // Refresh tokens must not be used as access tokens
             if ("refresh".equals(jwtUtil.extractType(token))) {
                 filterChain.doFilter(request, response);
                 return;
@@ -81,7 +73,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (JwtException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
-            // Don't set authentication — request will be rejected by SecurityConfig
         }
 
         filterChain.doFilter(request, response);

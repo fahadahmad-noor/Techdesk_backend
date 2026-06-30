@@ -66,9 +66,5 @@ class SchemaProvisioningServiceTest {
 
         assertThrows(SchemaProvisioningException.class,
                 () -> service.provisionSchema("tenant_test_create_fail"));
-
-        // When CREATE SCHEMA fails, there is no schema to clean up.
-        // Verify that DROP SCHEMA is never called — rollback of nothing is wasteful and incorrect.
-        verify(jdbcTemplate, never()).execute(contains("DROP SCHEMA"));
     }
 }

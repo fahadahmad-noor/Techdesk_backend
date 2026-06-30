@@ -3,15 +3,7 @@ package com.techdesk.auth.util;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Maps user roles to their corresponding permission lists.
- *
- * This is a Phase 3.2 temporary solution because the full permissions table
- * does not exist until Phase 4.1 (Week 2 RBAC implementation).
- *
- * TODO Phase 4.1: Replace this class with a DB-driven PermissionService
- *                 that reads from the permissions table via PermissionRepository.
- */
+// Hardcoded role-to-permissions map for Phase 3.2 — will be replaced by DB-driven PermissionService in Phase 4.1
 public final class RolePermissionMapper {
 
     private static final Map<String, List<String>> ROLE_PERMISSIONS = Map.of(
@@ -44,16 +36,8 @@ public final class RolePermissionMapper {
         )
     );
 
-    private RolePermissionMapper() {
-        // Utility class — not instantiable
-    }
+    private RolePermissionMapper() {}
 
-    /**
-     * Returns the permission list for a given role.
-     *
-     * @param role the role string (e.g. "EMPLOYEE")
-     * @return list of permission strings; empty list if role is unknown
-     */
     public static List<String> getPermissions(String role) {
         return ROLE_PERMISSIONS.getOrDefault(role, List.of());
     }

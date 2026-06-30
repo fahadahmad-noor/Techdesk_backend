@@ -1,9 +1,6 @@
 package com.techdesk.tenant.exception;
 
-/**
- * Thrown when a tenant with the given ID cannot be found in the public.tenants table.
- * Maps to HTTP 404 Not Found via GlobalExceptionHandler.
- */
+// Maps to HTTP 404 Not Found
 public class TenantNotFoundException extends RuntimeException {
 
     public TenantNotFoundException(String id) {

@@ -9,15 +9,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-/**
- * A DataSource wrapper that sets the PostgreSQL search_path on every connection
- * based on the schema stored in {@link TenantContextHolder}.
- *
- * This is the Phase 3.2 simplified approach for tenant-aware DB access.
- * It always falls back to public schema if no tenant is set.
- *
- * TODO Phase 3.4: Replace this with Hibernate MultiTenantConnectionProvider.
- */
+// Sets PostgreSQL search_path on every connection based on TenantContextHolder — Phase 3.4 will replace this
 public class TenantAwareDataSource extends DelegatingDataSource {
 
     private static final Logger log = LoggerFactory.getLogger(TenantAwareDataSource.class);
@@ -40,13 +32,7 @@ public class TenantAwareDataSource extends DelegatingDataSource {
         return connection;
     }
 
-    /**
-     * Sets the PostgreSQL search_path for the connection.
-     * If a tenant schema is present, it takes priority over public.
-     * Listing "public" ensures public-schema tables (tenants, audit_logs) are also accessible.
-     *
-     * @param connection the JDBC connection to configure
-     */
+    // Sets search_path to "tenant_schema, public" so tenant and shared tables are both reachable
     private void applyTenantSchema(Connection connection) throws SQLException {
         String schema = TenantContextHolder.getCurrentSchema();
         String searchPath = (schema != null) ? schema + ", public" : "public";

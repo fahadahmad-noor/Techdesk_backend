@@ -17,14 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * JWT authentication filter that runs once per request.
- *
- * Reads the Authorization header, validates the Bearer token using JwtUtil,
- * and populates the Spring Security context with the caller's identity and role.
- * If the token is missing or invalid, the request proceeds without authentication
- * and Spring Security's access control will reject it if the endpoint requires a role.
- */
+// Validates the Bearer token and loads the caller's identity into Spring Security context
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -65,7 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         } catch (JwtException ex) {
             log.warn("Invalid JWT received on tenant-service: {}", ex.getMessage());
-            // The SecurityContext remains empty — Spring Security will return 401 for protected routes.
+            // SecurityContext stays empty — Spring Security returns 401 for protected routes
         }
 
         filterChain.doFilter(request, response);

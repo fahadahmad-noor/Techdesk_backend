@@ -65,7 +65,7 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(user));
         when(jwtUtil.generateAccessToken(any(), any(), anyString(), any()))
                 .thenReturn("access.token");
-        when(jwtUtil.generateRefreshToken(any(), any(), anyString()))
+        when(jwtUtil.generateRefreshToken(any(), any(), anyString(), anyString()))
                 .thenReturn("refresh.token");
 
         LoginRequest req = new LoginRequest();
@@ -107,7 +107,7 @@ class AuthServiceTest {
                 eq("IT_MANAGER"),
                 argThat(perms -> perms.contains("VIEW_ALL_TICKETS"))))
                 .thenReturn("access.token");
-        when(jwtUtil.generateRefreshToken(any(), any(), anyString()))
+        when(jwtUtil.generateRefreshToken(any(), any(), anyString(), anyString()))
                 .thenReturn("refresh.token");
 
         LoginRequest req = new LoginRequest();

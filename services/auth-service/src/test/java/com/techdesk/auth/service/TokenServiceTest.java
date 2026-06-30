@@ -60,7 +60,7 @@ class TokenServiceTest {
         lenient().when(jwtUtil.extractType(RAW_TOKEN)).thenReturn("refresh");
         lenient().when(jwtUtil.generateAccessToken(any(), anyString(), anyString(), any()))
                 .thenReturn("new.access.token");
-        lenient().when(jwtUtil.generateRefreshToken(any(), anyString(), anyString()))
+        lenient().when(jwtUtil.generateRefreshToken(any(), anyString(), anyString(), anyString()))
                 .thenReturn("new.refresh.token");
     }
 

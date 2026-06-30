@@ -10,12 +10,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/**
- * Spring Security configuration for the tenant-service.
- *
- * All tenant management endpoints are restricted to callers holding the SUPER_ADMIN role.
- * The service is stateless — no sessions are created. Every request must carry a valid JWT.
- */
+// Locks down the entire service — only SUPER_ADMIN can access tenant endpoints, stateless JWT only
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

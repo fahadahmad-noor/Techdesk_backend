@@ -1,10 +1,6 @@
 package com.techdesk.tenant.exception;
 
-/**
- * Thrown when a request attempts to create a tenant with a company name
- * that already exists in the public.tenants table.
- * Maps to HTTP 409 Conflict via GlobalExceptionHandler.
- */
+// Maps to HTTP 409 Conflict — raised on duplicate company name or schema name
 public class TenantAlreadyExistsException extends RuntimeException {
 
     public TenantAlreadyExistsException(String companyName) {

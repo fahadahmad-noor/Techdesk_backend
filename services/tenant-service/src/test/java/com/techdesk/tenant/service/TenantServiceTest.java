@@ -98,7 +98,7 @@ class TenantServiceTest {
         when(tenantRepository.save(any(Tenant.class))).thenReturn(savedTenant);
         doNothing().when(schemaProvisioningService).provisionSchema(anyString());
         doNothing().when(emailService).sendWelcomeEmail(any(), any(), any(), any());
-        when(jdbcTemplate.update(anyString(), (Object[]) any())).thenReturn(1);
+        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any())).thenReturn(1);
 
         var response = tenantService.createTenant(validRequest);
 

@@ -5,10 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/**
- * Incoming payload for POST /api/tenants.
- * Submitted by the Super Admin when onboarding a new company onto the TechDesk platform.
- */
+// Request DTO for POST /api/tenants — submitted by Super Admin when onboarding a new company
 public class CreateTenantRequest {
 
     @NotBlank(message = "Company name is required")

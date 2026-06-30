@@ -11,29 +11,18 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 
 import javax.sql.DataSource;
 
-/**
- * Wraps the standard Spring Boot DataSource with our TenantAwareDataSource
- * so that every JDBC connection automatically applies the correct schema search_path.
- *
- * TODO Phase 3.4: Remove this config and replace with Hibernate multi-tenancy configuration.
- */
+// Wraps the default DataSource with tenant schema routing — will be replaced by Hibernate multi-tenancy in Phase 3.4
 @Configuration
 public class DataSourceConfig {
 
-    /**
-     * The raw DataSource configured from application.yml properties.
-     * Kept as a separate bean so TenantAwareDataSource can delegate to it.
-     */
+    // Raw datasource from application.yml — used as the delegate inside TenantAwareDataSource
     @Bean(name = "rawDataSource")
     @ConfigurationProperties(prefix = "spring.datasource")
     public DataSource rawDataSource() {
         return DataSourceBuilder.create().build();
     }
 
-    /**
-     * The primary DataSource used by all JPA and JDBC operations.
-     * Wraps the raw DataSource with tenant schema routing.
-     */
+    // Primary datasource — routes every connection to the correct tenant schema automatically
     @Primary
     @Bean(name = "dataSource")
     public DataSource dataSource(@Qualifier("rawDataSource") DataSource rawDataSource) {

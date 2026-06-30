@@ -3,10 +3,7 @@ package com.techdesk.tenant.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
-/**
- * Incoming payload for PATCH /api/tenants/{id}/status.
- * Submitted by the Super Admin to suspend or reactivate a company account.
- */
+// Request DTO for PATCH /api/tenants/{id}/status — accepts ACTIVE or SUSPENDED
 public class UpdateTenantStatusRequest {
 
     @NotBlank(message = "Status is required")
