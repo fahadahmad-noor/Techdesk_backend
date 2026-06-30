@@ -56,8 +56,8 @@ class SchemaProvisioningServiceTest {
     }
 
     @Test
-    @DisplayName("provisionSchema — does not call DROP SCHEMA when CREATE SCHEMA itself fails")
-    void provisionSchema_schemaCreationFails_dropsSchemaAttemptedSafely() {
+    @DisplayName("provisionSchema — does NOT call DROP SCHEMA when CREATE SCHEMA itself fails (nothing was created to clean up)")
+    void provisionSchema_schemaCreationFails_doesNotAttemptRollback() {
         SchemaProvisioningService service = new SchemaProvisioningService(
                 jdbcTemplate, dataSource, "classpath:db/migration/tenant");
 
@@ -66,5 +66,9 @@ class SchemaProvisioningServiceTest {
 
         assertThrows(SchemaProvisioningException.class,
                 () -> service.provisionSchema("tenant_test_create_fail"));
+
+        // When CREATE SCHEMA fails, there is no schema to clean up.
+        // Verify that DROP SCHEMA is never called — rollback of nothing is wasteful and incorrect.
+        verify(jdbcTemplate, never()).execute(contains("DROP SCHEMA"));
     }
 }

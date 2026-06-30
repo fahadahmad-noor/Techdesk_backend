@@ -14,8 +14,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -45,6 +47,15 @@ class TenantServiceTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+
+    /**
+     * Use @Spy (real object) rather than @Mock for BCryptPasswordEncoder.
+     * A mock would return null from encode(), causing a NullPointerException
+     * when TenantService tries to insert the hashed password.
+     * A spy uses the actual BCrypt implementation — correct behaviour in tests.
+     */
+    @Spy
+    private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4); // cost 4 for fast tests
 
     @InjectMocks
     private TenantService tenantService;
@@ -87,7 +98,7 @@ class TenantServiceTest {
         when(tenantRepository.save(any(Tenant.class))).thenReturn(savedTenant);
         doNothing().when(schemaProvisioningService).provisionSchema(anyString());
         doNothing().when(emailService).sendWelcomeEmail(any(), any(), any(), any());
-        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any())).thenReturn(1);
+        when(jdbcTemplate.update(anyString(), (Object[]) any())).thenReturn(1);
 
         var response = tenantService.createTenant(validRequest);
 

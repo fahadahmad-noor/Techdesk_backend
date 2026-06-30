@@ -11,6 +11,7 @@ import com.techdesk.tenant.exception.TenantNotFoundException;
 import com.techdesk.tenant.repository.TenantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Core business logic for tenant lifecycle management.
@@ -41,6 +44,17 @@ public class TenantService {
 
     private static final Logger log = LoggerFactory.getLogger(TenantService.class);
 
+    /**
+     * Character set used when generating temporary passwords.
+     * Excludes visually ambiguous characters (0, O, l, I) to reduce
+     * copy-paste errors when admins read the password from their email.
+     */
+    private static final String TEMP_PASSWORD_CHARS =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+
+    /** Cryptographically secure random source for temporary password generation. */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final TenantRepository tenantRepository;
     private final SchemaProvisioningService schemaProvisioningService;
     private final EmailService emailService;
@@ -50,12 +64,13 @@ public class TenantService {
     public TenantService(TenantRepository tenantRepository,
                          SchemaProvisioningService schemaProvisioningService,
                          EmailService emailService,
-                         JdbcTemplate jdbcTemplate) {
+                         JdbcTemplate jdbcTemplate,
+                         BCryptPasswordEncoder passwordEncoder) {
         this.tenantRepository = tenantRepository;
         this.schemaProvisioningService = schemaProvisioningService;
         this.emailService = emailService;
         this.jdbcTemplate = jdbcTemplate;
-        this.passwordEncoder = new BCryptPasswordEncoder(12);
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -87,14 +102,23 @@ public class TenantService {
         tenant.setSchemaName(schemaName);
         tenant.setStatus(TenantStatus.PENDING);
         tenant.setPlan(TenantPlan.valueOf(request.getPlan()));
-        tenantRepository.save(tenant);
+
+        // Wrap save() to handle the rare concurrent-creation race condition (TOCTOU).
+        // If two simultaneous requests pass the existsByName check, the DB unique constraint
+        // on the name column will reject the second insert — we translate that to our
+        // clean domain exception so callers always receive a 409, never a raw 500.
+        try {
+            tenantRepository.save(tenant);
+        } catch (DataIntegrityViolationException ex) {
+            throw new TenantAlreadyExistsException(request.getCompanyName());
+        }
 
         // Provision the isolated PostgreSQL schema and run all tenant Flyway migrations.
         // If this throws, @Transactional rolls back the tenant record and the schema is dropped.
         schemaProvisioningService.provisionSchema(schemaName);
 
-        // Generate a temporary password for the first Company Admin login.
-        String temporaryPassword = UUID.randomUUID().toString().substring(0, 12);
+        // Generate a cryptographically secure temporary password for the first Company Admin login.
+        String temporaryPassword = generateTemporaryPassword();
         String hashedPassword = passwordEncoder.encode(temporaryPassword);
 
         // Insert the default COMPANY_ADMIN user directly into the new tenant schema.
@@ -133,6 +157,7 @@ public class TenantService {
      * @param pageable pagination and sorting parameters
      * @return a Page of TenantResponse objects
      */
+    @Transactional(readOnly = true)
     public Page<TenantResponse> getAllTenants(TenantStatus status, Pageable pageable) {
         Page<Tenant> tenants = (status != null)
                 ? tenantRepository.findByStatus(status, pageable)
@@ -160,7 +185,9 @@ public class TenantService {
 
         TenantStatus newStatus = TenantStatus.valueOf(request.getStatus());
         tenant.setStatus(newStatus);
-        tenantRepository.save(tenant);
+        // No explicit save() needed: the entity is JPA-managed within this @Transactional
+        // boundary. Hibernate's dirty-checking will flush the status change automatically
+        // on transaction commit.
 
         log.info("Tenant '{}' status updated to {}.", tenant.getName(), newStatus);
 
@@ -191,6 +218,22 @@ public class TenantService {
                 .replaceAll("_+", "_")
                 .replaceAll("^_|_$", "");
         return "tenant_" + normalized;
+    }
+
+    /**
+     * Generates a 14-character cryptographically secure temporary password.
+     *
+     * Uses SecureRandom (not UUID.randomUUID which uses java.util.Random internally)
+     * and a curated character set that excludes visually ambiguous characters
+     * (e.g., 0/O, l/I/1) to reduce copy-paste errors when admins read the email.
+     *
+     * @return a random 14-character password string
+     */
+    private String generateTemporaryPassword() {
+        return SECURE_RANDOM
+                .ints(14, 0, TEMP_PASSWORD_CHARS.length())
+                .mapToObj(i -> String.valueOf(TEMP_PASSWORD_CHARS.charAt(i)))
+                .collect(Collectors.joining());
     }
 
     /**

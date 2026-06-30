@@ -2,6 +2,7 @@ package com.techdesk.tenant.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -51,6 +52,19 @@ public class GlobalExceptionHandler {
         log.error("Schema provisioning failed and was rolled back: {}", ex.getMessage());
         return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Tenant creation failed during database provisioning. The operation has been fully rolled back.");
+    }
+
+    /**
+     * Handles DB unique constraint violations not already caught by domain-level guards.
+     * This is a safety net for concurrent requests that pass the existsByName check
+     * simultaneously — the second DB insert fails with a constraint violation.
+     * Returns 409 Conflict.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT,
+                "A resource with this identifier already exists.");
     }
 
     /**
