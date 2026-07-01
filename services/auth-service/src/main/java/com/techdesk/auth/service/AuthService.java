@@ -23,13 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Core authentication service.
- * Handles all 5 Phase 3.2 endpoint flows.
- * Delegates token lifecycle to TokenService and emails to EmailService.
- *
- * No business logic lives in the controller — only here.
- */
+// All authentication business logic lives here — controller just delegates
 @Service
 public class AuthService {
 
@@ -59,19 +53,12 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
-    /**
-     * Authenticates user and returns a JWT token pair.
-     * Spring Security's AuthenticationManager verifies email + BCrypt password.
-     *
-     * @return TokenResponse containing access token (15 min) and refresh token (7 days)
-     */
+    // Verifies credentials via Spring Security then returns a JWT access + refresh token pair
     public TokenResponse login(LoginRequest request) {
-        // Delegate credential verification to Spring Security (uses CustomUserDetailsService)
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(), request.getPassword()));
 
-        // Load the user entity to build the JWT payload
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UserNotFoundException(
                         "User not found: " + request.getEmail()));
@@ -80,46 +67,30 @@ public class AuthService {
         String role        = user.getRole();
         List<String> perms = RolePermissionMapper.getPermissions(role);
 
-        // Generate access token
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), tenantId, role, perms);
+        String accessToken  = jwtUtil.generateAccessToken(user.getId(), tenantId, role, perms);
+        String jti          = UUID.randomUUID().toString();
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), tenantId, role, jti);
 
-        // Generate refresh token with a UUID jti for Redis storage
-        String jti           = UUID.randomUUID().toString();
-        String refreshToken  = jwtUtil.generateRefreshToken(user.getId(), tenantId, jti);
-
-        // Save refresh token to Redis
         tokenService.saveRefreshToken(user.getId(), tenantId, role, jti);
 
         log.info("User {} logged in successfully", user.getEmail());
         return new TokenResponse(accessToken, refreshToken);
     }
 
-    /**
-     * Rotates a refresh token — invalidates old one, returns new pair.
-     * Detects replay attacks and revokes all sessions if detected.
-     */
+    // Rotates the refresh token and returns a new token pair — replay detection handled inside TokenService
     public TokenResponse refreshToken(RefreshTokenRequest request) {
-        // We need the permissions to generate the new access token.
-        // Extract role from the token, then look up permissions.
-        // The token is validated inside TokenService.validateAndRotate.
         String role = jwtUtil.extractRole(request.getRefreshToken());
         List<String> perms = RolePermissionMapper.getPermissions(role);
-
         return tokenService.validateAndRotate(request.getRefreshToken(), perms);
     }
 
-    /**
-     * Logs out the user by deleting their refresh token from Redis.
-     */
+    // Removes the refresh token from Redis — access token expires naturally
     public MessageResponse logout(RefreshTokenRequest request) {
         tokenService.invalidate(request.getRefreshToken());
         return new MessageResponse("Logged out successfully", true);
     }
 
-    /**
-     * Generates a time-limited password reset token and emails it to the user.
-     * Deliberately generic response to prevent email enumeration attacks.
-     */
+    // Sends a password reset link — always returns the same message to prevent email enumeration
     public MessageResponse forgotPassword(ForgotPasswordRequest request) {
         userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
             String resetToken = UUID.randomUUID().toString();
@@ -135,15 +106,11 @@ public class AuthService {
             log.info("Password reset token generated for {}", user.getEmail());
         });
 
-        // Always return the same message — don't reveal if email exists
         return new MessageResponse(
                 "If that email is registered, a reset link has been sent.", true);
     }
 
-    /**
-     * Validates a reset token and updates the user's password.
-     * Token is invalidated after use.
-     */
+    // Validates the reset token, updates the password, and forces re-login on all devices
     @Transactional
     public MessageResponse resetPassword(ResetPasswordRequest request) {
         PasswordResetToken resetRecord = passwordResetTokenRepository
@@ -158,15 +125,13 @@ public class AuthService {
         User user = userRepository.findById(UUID.fromString(resetRecord.getUserId()))
                 .orElseThrow(() -> new UserNotFoundException("User no longer exists"));
 
-        // Hash and save the new password
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        // Mark the reset token as used to prevent re-use
         resetRecord.setUsed(true);
         passwordResetTokenRepository.save(resetRecord);
 
-        // Revoke all active refresh tokens — force re-login
+        // Revoke all sessions so the user has to log in with the new password
         tokenService.invalidateAllForUser(user.getId());
 
         log.info("Password reset successful for userId={}", user.getId());

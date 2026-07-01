@@ -4,12 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * JPA entity mapping to the public.tenants table.
- * Used by TenantInterceptor to resolve schema_name from X-Tenant-ID header.
- * The explicit schema = "public" ensures this always queries the public schema,
- * regardless of the search_path set by TenantAwareDataSource.
- */
+// Read-only view of public.tenants used by TenantInterceptor to resolve schema from X-Tenant-ID header
 @Entity
 @Table(name = "tenants", schema = "public")
 public class Tenant {

@@ -12,19 +12,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Stateless utility for JWT generation and parsing.
- * Does NOT call the database or Redis — pure token operations only.
- *
- * Access token payload:
- *   - userId   : UUID of the user
- *   - tenantId : PostgreSQL schema name (e.g. "tenant_companya")
- *   - role     : User's role (e.g. "EMPLOYEE")
- *   - permissions : List of permission strings (hardcoded from role in Phase 3.2)
- *   - jti      : UUID used as Redis key for refresh tokens
- *
- * Uses JJWT 0.12.x API.
- */
+// Stateless JWT helper — only generates and parses tokens, no DB or Redis calls
 @Component
 public class JwtUtil {
 
@@ -41,9 +29,7 @@ public class JwtUtil {
         this.refreshExpirationMs = refreshExpirationMs;
     }
 
-    /**
-     * Generates a signed access JWT (15-minute expiry by default).
-     */
+    // Builds a short-lived access token with userId, tenantId, role, and permissions
     public String generateAccessToken(UUID userId, String tenantId, String role,
                                       List<String> permissions) {
         return Jwts.builder()
@@ -58,25 +44,21 @@ public class JwtUtil {
                 .compact();
     }
 
-    /**
-     * Generates a signed refresh JWT (7-day expiry by default).
-     * The jti claim is a UUID that serves as the Redis key for this token's metadata.
-     */
-    public String generateRefreshToken(UUID userId, String tenantId, String jti) {
+    // Builds a long-lived refresh token — role is embedded so rotation doesn't need a DB call
+    public String generateRefreshToken(UUID userId, String tenantId, String role, String jti) {
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim("tenantId", tenantId)
+                .claim("role", role)
                 .claim("type", "refresh")
-                .id(jti)  // jti claim — used as Redis key
+                .id(jti)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshExpirationMs))
                 .signWith(signingKey)
                 .compact();
     }
 
-    /**
-     * Extracts all claims from a token. Throws JwtException if invalid/expired.
-     */
+    // Parses and verifies the token signature — throws JwtException if invalid or expired
     public Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(signingKey)
@@ -109,9 +91,7 @@ public class JwtUtil {
         return extractAllClaims(token).getExpiration().before(new Date());
     }
 
-    /**
-     * Returns true if the token signature is valid and it is not expired.
-     */
+    // Returns false on any parse error — callers don't need to handle JwtException
     public boolean isTokenValid(String token) {
         try {
             return !isTokenExpired(token);

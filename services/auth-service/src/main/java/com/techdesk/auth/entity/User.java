@@ -4,14 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * JPA entity mapping to the tenant-schema users table.
- * The exact schema is determined at runtime by TenantAwareDataSource (Phase 3.2)
- * and later by Hibernate MultiTenantConnectionProvider (Phase 3.4).
- *
- * Note: Only the fields needed for authentication are mapped here.
- * The full User domain object is owned by user-service.
- */
+// Auth-service's lightweight view of the users table — schema routing is handled by TenantAwareDataSource
 @Entity
 @Table(name = "users")
 public class User {

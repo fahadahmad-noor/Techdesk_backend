@@ -26,7 +26,7 @@ logs/
 frontend/
 
 # Exclude resources directory
-**/src/main/resources/
+../RESOURCES/
 
 # Temporary scripts
 scratch/

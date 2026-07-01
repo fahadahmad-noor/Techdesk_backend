@@ -5,15 +5,8 @@ import org.springframework.data.repository.CrudRepository;
 
 import java.util.List;
 
-/**
- * Spring Data Redis repository for RefreshToken.
- * The @Indexed annotation on userId enables findByUserId queries.
- */
+// Spring Data Redis repo — @Indexed on userId enables the findByUserId query for session revocation
 public interface RefreshTokenRepository extends CrudRepository<RefreshToken, String> {
 
-    /**
-     * Finds all active refresh tokens for a user.
-     * Used during replay attack detection to invalidate ALL sessions.
-     */
     List<RefreshToken> findByUserId(String userId);
 }

@@ -7,11 +7,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-/**
- * Sends transactional emails via JavaMailSender.
- * Configured to use MailHog (localhost:1025) in local development.
- * View sent emails at http://localhost:8025
- */
+// Sends transactional emails — MailHog captures all mail in local dev at http://localhost:8025
 @Service
 public class EmailService {
 
@@ -26,12 +22,7 @@ public class EmailService {
         this.frontendUrl = frontendUrl;
     }
 
-    /**
-     * Sends a password reset email with a time-limited link (15 minutes).
-     *
-     * @param toEmail   recipient's email address
-     * @param resetToken  the UUID reset token stored in Redis
-     */
+    // Sends a 15-minute reset link — silently ignores send failures to prevent email enumeration
     public void sendPasswordResetEmail(String toEmail, String resetToken) {
         String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
 
@@ -53,7 +44,6 @@ public class EmailService {
             log.info("Password reset email sent to {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send password reset email to {}", toEmail, e);
-            // Don't throw — we don't reveal email existence to prevent enumeration
         }
     }
 }

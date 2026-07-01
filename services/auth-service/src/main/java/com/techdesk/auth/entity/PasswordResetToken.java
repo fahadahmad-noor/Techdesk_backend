@@ -4,23 +4,19 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
 import org.springframework.data.redis.core.TimeToLive;
 
-/**
- * Redis entity for password reset tokens.
- * Stored as: "password_reset_token:<token>"
- * TTL: 15 minutes (900 seconds), matching the forgot-password flow requirement.
- */
+// Redis entity for a password reset token — key: "password_reset_token:<token>", TTL: 15 minutes
 @RedisHash("password_reset_token")
 public class PasswordResetToken {
 
     @Id
-    private String token;        // UUID string used as Redis key
+    private String token;
 
-    private String userId;       // String form of UUID
-    private String email;        // User's email (for validation)
-    private boolean used;        // Prevents token re-use after reset
+    private String userId;
+    private String email;
+    private boolean used;
 
     @TimeToLive
-    private long ttl = 900L;     // 15 minutes in seconds
+    private long ttl = 900L; // 15 minutes in seconds
 
     // Getters and Setters
 

@@ -6,17 +6,10 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-/**
- * Redis configuration for token blacklist and refresh token operations.
- */
+// Configures a String/String RedisTemplate for refresh token and reset token storage
 @Configuration
 public class RedisConfig {
 
-    /**
-     * RedisTemplate with String keys and String values.
-     * Used by TokenService for storing refresh token metadata directly
-     * (in addition to Spring Data Redis repositories for RefreshToken and PasswordResetToken entities).
-     */
     @Bean
     public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, String> template = new RedisTemplate<>();

@@ -10,18 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/**
- * Intercepts every HTTP request and resolves the tenant schema from the X-Tenant-ID header.
- *
- * Flow:
- *  1. API Gateway injects X-Tenant-ID header (from subdomain or JWT claim).
- *  2. This interceptor reads that header.
- *  3. Looks up the actual schema_name from public.tenants table.
- *  4. Stores schema_name in TenantContextHolder for the duration of the request.
- *  5. Clears TenantContextHolder after the request completes.
- *
- * TODO Phase 3.4: Integrate with Hibernate CurrentTenantIdentifierResolver instead.
- */
+// Reads X-Tenant-ID header, resolves the schema name, and stores it in TenantContextHolder for the request
 public class TenantInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(TenantInterceptor.class);
@@ -53,7 +42,6 @@ public class TenantInterceptor implements HandlerInterceptor {
             TenantContextHolder.setCurrentSchema(tenant.getSchemaName());
             log.debug("Resolved tenant '{}' → schema '{}'", tenantIdentifier, tenant.getSchemaName());
         } else {
-            // No tenant header — defaults to public schema (e.g. health checks)
             log.debug("No X-Tenant-ID header found, using public schema");
         }
 

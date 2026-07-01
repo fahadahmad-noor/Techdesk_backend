@@ -4,16 +4,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * JPA entity mapping to the public.audit_logs table.
- * Used by auth-service to write security events (e.g., replay attacks) directly.
- *
- * The explicit schema = "public" is critical — audit logs must always go to the
- * shared public schema, never to a tenant schema.
- *
- * TODO Phase 6.3: Replace direct DB writes with Spring ApplicationEvent publishing.
- *                 The AuditLogListener in audit-service will handle persistence then.
- */
+// Maps to public.audit_logs — always public schema, never tenant schema
+// TODO Phase 6.3: Replace direct writes with ApplicationEvent publishing to audit-service
 @Entity
 @Table(name = "audit_logs", schema = "public")
 public class AuditLog {

@@ -14,11 +14,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Centralized exception handler — keeps controllers 100% free of try/catch blocks.
- * All exceptions thrown anywhere in the service layer are caught here and
- * converted to clean JSON error responses.
- */
+// Converts all exceptions to clean JSON error responses — controllers stay free of try/catch
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -55,9 +51,7 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Invalid credentials");
     }
 
-    /**
-     * Handles @Valid bean validation failures — returns field-level errors.
-     */
+    // Returns field-level @Valid failures as a 400 with a breakdown per field
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationErrors(
             MethodArgumentNotValidException ex) {
