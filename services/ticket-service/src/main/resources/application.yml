@@ -14,9 +14,13 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        multiTenancy: SCHEMA
   flyway:
     enabled: true
     locations: classpath:db/migration/public
+
+jwt:
+  secret: ${JWT_SECRET:default-dev-secret-change-in-production}
 
 eureka:
   client:
